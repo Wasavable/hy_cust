@@ -1,0 +1,72 @@
+---
+title: "Lotto Results Analysis"
+author: "Your Name"
+format: html
+execute:
+  echo: true
+  eval: true
+---
+
+# Load necessary libraries
+```{r}
+library(httr)
+library(rvest)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+
+get_lotto_results <- function(draw_number) {
+  url <- 'https://www.dhlottery.co.kr/gameResult.do?method=byWin'
+  
+  data_lotto <- POST(
+    url, 
+    body = list(
+      drwNo = as.character(draw_number),
+      dwrNoList = as.character(draw_number)
+    )
+  )
+  
+  data_lotto_html <- data_lotto %>% read_html()
+  
+  winning_numbers <- data_lotto_html %>%
+    html_nodes('.num.win') %>%
+    html_text() %>%
+    str_extract_all('\\d+') %>%
+    unlist()
+  
+  return(as.numeric(winning_numbers))
+}
+
+get_multiple_draws <- function(start_draw, end_draw) {
+  all_results <- data.frame()
+  
+  for (draw_number in start_draw:end_draw) {
+    Sys.sleep(2)  # Wait for 2 seconds to avoid overloading the server
+    numbers <- get_lotto_results(draw_number)
+    draw_results <- data.frame(DrawNumber = draw_number, Number = numbers)
+    all_results <- bind_rows(all_results, draw_results)
+  }
+  
+  return(all_results)
+}
+
+start_draw <- 1004
+end_draw <- 1009
+lotto_results <- get_multiple_draws(start_draw, end_draw)
+
+number_counts <- lotto_results %>%
+  group_by(Number) %>%
+  summarize(Count = n()) %>%
+  arrange(desc(Count))
+
+# Print the results
+print(number_counts)
+
+ggplot(number_counts, aes(x = factor(Number), y = Count)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Lotto Number Frequency",
+       x = "Number",
+       y = "Frequency") +
+  theme_minimal()
+```
+
